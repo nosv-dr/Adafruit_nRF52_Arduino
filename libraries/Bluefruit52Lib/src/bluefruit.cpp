@@ -537,7 +537,7 @@ static inline bool is_tx_power_valid(int8_t power)
 {
 #if defined(NRF52832_XXAA)
   int8_t const accepted[] = { -40, -20, -16, -12, -8, -4, 0, 3, 4 };
-#elif defined( NRF52840_XXAA)
+#elif defined(NRF52840_XXAA) || defined(NRF52833_XXAA)
   int8_t const accepted[] = { -40, -20, -16, -12, -8, -4, 0, 2, 3, 4, 5, 6, 7, 8 };
 #endif
 
@@ -605,6 +605,21 @@ bool AdafruitBluefruit::connected(uint16_t conn_hdl)
 {
   BLEConnection* conn = this->Connection(conn_hdl);
   return conn && conn->connected();
+}
+
+uint8_t AdafruitBluefruit::getConnectedHandles(uint16_t* hdl_list, uint8_t max_count)
+{
+  uint8_t count = 0;
+  for (uint16_t hdl = 0; (hdl < BLE_MAX_CONNECTION) && (count < max_count); ++hdl)
+  {
+    if (this->connected(hdl))
+    {
+      hdl_list[count] = hdl;
+      count++;
+    }
+  }
+
+  return count;
 }
 
 bool AdafruitBluefruit::disconnect(uint16_t conn_hdl)

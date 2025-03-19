@@ -30,9 +30,15 @@ nrf_nvic_state_t nrf_nvic_state;
 // Must match temp register in bootloader
 #define BOOTLOADER_VERSION_REGISTER     NRF_TIMER2->CC[0]
 uint32_t bootloaderVersion = 0;
+static uint32_t _reset_reason = 0;
 
 void init( void )
 {
+  _reset_reason = NRF_POWER->RESETREAS;
+
+  // clear reset reason: can save it for application usage if needed.
+  NRF_POWER->RESETREAS |= NRF_POWER->RESETREAS;
+
   // Retrieve bootloader version
   bootloaderVersion = BOOTLOADER_VERSION_REGISTER;
 
@@ -63,22 +69,46 @@ void init( void )
 #endif
 }
 
+uint32_t readResetReason(void)
+{
+  return _reset_reason;
+}
+
+static void reset_mcu(uint32_t gpregret)
+{
+  // disable SD
+  sd_softdevice_disable();
+
+  // Disable all interrupts
+  NVIC->ICER[0]=0xFFFFFFFF;
+  NVIC->ICPR[0]=0xFFFFFFFF;
+#if defined(__NRF_NVIC_ISER_COUNT) && __NRF_NVIC_ISER_COUNT == 2
+  NVIC->ICER[1]=0xFFFFFFFF;
+  NVIC->ICPR[1]=0xFFFFFFFF;
+#endif
+
+  NRF_POWER->GPREGRET = gpregret;
+
+  NVIC_SystemReset();
+
+  // maybe yield ?
+  while(1) {}
+}
+
 void enterUf2Dfu(void)
 {
-  NRF_POWER->GPREGRET = DFU_MAGIC_UF2_RESET;
-  NVIC_SystemReset();
+  reset_mcu(DFU_MAGIC_UF2_RESET);
 }
 
 void enterSerialDfu(void)
 {
-  NRF_POWER->GPREGRET = DFU_MAGIC_SERIAL_ONLY_RESET;
-  NVIC_SystemReset();
+  // shut down everything
+  reset_mcu(DFU_MAGIC_SERIAL_ONLY_RESET);
 }
 
 void enterOTADfu(void)
 {
-  NRF_POWER->GPREGRET = DFU_MAGIC_OTA_RESET;
-  NVIC_SystemReset();
+  reset_mcu(DFU_MAGIC_OTA_RESET);
 }
 
 void waitForEvent(void)
